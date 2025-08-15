@@ -12,6 +12,8 @@ jobs:
           echo "Work Item ID: ${{ github.event.client_payload.work_item_id }}"
           echo "Work Item Title: ${{ github.event.client_payload.work_item_title }}"
           echo "Work Item State: ${{ github.event.client_payload.work_item_state }}"
+          echo "Work Item State: ${{ github.event.client_payload.test }}"
+          echo "Work Item State: ${{ github.event.client_payload.timestamp }}"
           
       - name: Update PR Status
         uses: actions/github-script@v7
