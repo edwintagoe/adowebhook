@@ -1,0 +1,55 @@
+name: ADO QA Status Update
+on:
+  repository_dispatch:
+    types: [workitem-updated]
+
+jobs:
+  update-qa-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse ADO Webhook
+        id: parse
+        run: |
+          echo "work_item_id=${{ github.event.client_payload.resource.id }}" >> $GITHUB_OUTPUT
+          echo "work_item_state=${{ github.event.client_payload.resource.fields['System.State'] }}" >> $GITHUB_OUTPUT
+          
+      - name: Update PR Status
+        if: steps.parse.outputs.work_item_state == 'Ready for Merge'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workItem = context.payload.client_payload.resource;
+            const relations = workItem.relations || [];
+            
+            // Find GitHub PR links in work item relations
+            const githubLinks = relations.filter(rel => 
+              rel.url && rel.url.includes('github.com') && rel.url.includes('pull')
+            );
+            
+            for (const link of githubLinks) {
+              const prUrl = link.url;
+              const prNumber = prUrl.split('/').pop();
+              
+              // Get PR details
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: parseInt(prNumber)
+              });
+              
+              // Create check run
+              await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'QA Check',
+                head_sha: pr.head.sha,
+                status: 'completed',
+                conclusion: 'success',
+                output: {
+                  title: 'QA Check Passed',
+                  summary: `ADO work item ${workItem.id} is ready for merge`
+                }
+              });
+              
+              console.log(`Updated QA status for PR #${prNumber}`);
+            }
